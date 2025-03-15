@@ -2,6 +2,7 @@ import numpy as np
 import cv2
 import time
 import os
+from numba import njit
 
 
 def compute_energy(image):
@@ -33,9 +34,10 @@ def compute_energy(image):
     return energy
 
 
-def find_vertical_seam(energy):
+@njit
+def find_vertical_seam_jit(energy):
     """
-    Find the optimal vertical seam DP
+    Find the vertical seam using JIT
     Args:
         energy: array of the energy map
     Returns:
@@ -48,29 +50,33 @@ def find_vertical_seam(energy):
     # Cumulative minimum energy
     for i in range(1, height):
         for j in range(width):
-            left = M[i - 1, j - 1] if j > 0 else float("inf")
+            left = M[i - 1, j - 1] if j > 0 else np.inf
             center = M[i - 1, j]
-            right = M[i - 1, j + 1] if j < width - 1 else float("inf")
+            right = M[i - 1, j + 1] if j < width - 1 else np.inf
             M[i, j] = energy[i, j] + min(left, center, right)
 
     # Backtrack to find the seam
-    seam = []
+    seam = np.zeros(height, dtype=np.int32)
     j = np.argmin(M[-1, :])
-    seam.append((height - 1, j))
+    seam[height - 1] = j
 
     for i in range(height - 2, -1, -1):
-        left = M[i, j - 1] if j > 0 else float("inf")
+        left = M[i, j - 1] if j > 0 else np.inf
         center = M[i, j]
-        right = M[i, j + 1] if j < width - 1 else float("inf")
+        right = M[i, j + 1] if j < width - 1 else np.inf
         min_val = min(left, center, right)
         if j > 0 and left == min_val:
             j -= 1
         elif j < width - 1 and right == min_val:
             j += 1
-        seam.append((i, j))
+        seam[i] = j
 
-    seam.reverse()
     return seam
+
+
+def find_vertical_seam(energy):
+    seam_indices = find_vertical_seam_jit(energy)
+    return [(i, j) for i, j in enumerate(seam_indices)]
 
 
 def find_horizontal_seam(energy):
@@ -165,7 +171,7 @@ def find_multiple_seams(image, num_seams, direction):
 
         seams.append(seam)
         for i, j in seam:
-            energy[i, j] = float("inf")
+            energy[i, j] = np.inf
 
     return seams
 
@@ -267,7 +273,7 @@ def seam_carve(image, mode, target_width=None, target_height=None):
 
 if __name__ == "__main__":
     input_dir = "input"
-    output_dir = "output"
+    output_dir = "output/optimized"
 
     os.makedirs(output_dir, exist_ok=True)
 
