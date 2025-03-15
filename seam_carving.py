@@ -1,5 +1,7 @@
 import numpy as np
 import cv2
+import time
+import os
 
 
 def compute_energy(image):
@@ -264,14 +266,35 @@ def seam_carve(image, mode, target_width=None, target_height=None):
 
 
 if __name__ == "__main__":
-    input_image = cv2.imread("input_2.jpg")
+    input_dir = "input"
+    output_dir = "output"
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    input_image_path = os.path.join(input_dir, "input_2.jpg")
+    input_image = cv2.imread(input_image_path)
+
     if input_image is None:
-        raise FileNotFoundError("Input image not found")
+        raise FileNotFoundError(f"Input image not found at {input_image_path}")
 
     #     modes = [("horizontal", 600, None), ("vertical", None, 600), ("both", 400, 400)]
     modes = [("both", 400, 400)]
+
     for mode, tw, th in modes:
+        start = time.time()
+
+        mode_output_dir = os.path.join(output_dir, mode)
+        os.makedirs(mode_output_dir, exist_ok=True)
+
         resized, vis = seam_carve(input_image, mode, target_width=tw, target_height=th)
-        cv2.imwrite(f"resized_{mode}.jpg", resized)
-        cv2.imwrite(f"vis_{mode}.jpg", vis)
-        print(f"Completed {mode} resizing: {resized.shape}")
+
+        resized_path = os.path.join(mode_output_dir, f"resized_{mode}.jpg")
+        vis_path = os.path.join(mode_output_dir, f"vis_{mode}.jpg")
+
+        cv2.imwrite(resized_path, resized)
+        cv2.imwrite(vis_path, vis)
+
+        end = time.time()
+        print(
+            f"Completed {mode} resizing: {resized.shape}, took {end - start:.2f} seconds, saved to {mode_output_dir}"
+        )
